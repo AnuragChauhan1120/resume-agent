@@ -11,6 +11,8 @@ from app.agents.job_finder import find_jobs
 from app.models.resume import JobResult, JobSearchResponse
 from app.agents.resume_improver import improve_resume
 from app.models.resume import ImproveRequest, ImproveResponse
+from fastapi.responses import StreamingResponse
+from app.pipeline.generator import generate_answer_stream
 import tempfile
 import os
 
@@ -207,3 +209,45 @@ async def find_jobs_endpoint(filename: str):
 async def improve_resume_endpoint(request: ImproveRequest):
     result = improve_resume(request.filename, request.job_description)
     return ImproveResponse(**result)
+
+
+@router.get("/ask/stream")
+async def ask_resume_stream(question: str, filename: str = None, top_k: int = 3):
+    # Same retrieval pipeline as before
+    queries = generate_queries(question)
+    
+    all_chunks = []
+    seen_texts = set()
+    
+    for query in queries:
+        query_vector = embed_query(query)
+        results = search(
+            query_vector=query_vector,
+            top_k=top_k,
+            filename=filename
+        )
+        for chunk in results:
+            if chunk["text"] not in seen_texts:
+                seen_texts.add(chunk["text"])
+                all_chunks.append(chunk)
+    
+    if not all_chunks:
+        raise HTTPException(status_code=404, detail="No resume data found")
+    
+    reranked = rerank(question, all_chunks, top_k=top_k)
+    
+    # Stream the response
+    def token_generator():
+        for token in generate_answer_stream(question, reranked):
+            # SSE format — each chunk must be "data: ...\n\n"
+            yield f"data: {token}\n\n"
+        yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        token_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"  # prevents nginx from buffering the stream
+        }
+    )

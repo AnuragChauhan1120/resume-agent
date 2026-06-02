@@ -71,40 +71,45 @@ async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
   }
 }
 
-  async function handleAsk() {
-    if (!question.trim() || !filename) return;
-    setAsking(true);
-    setAskResult(null);
-    try {
-      const res = await fetch(`${API}/resume/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, filename, top_k: 3 }),
-      });
-      const data = await res.json();
-      setAskResult(data);
-    } catch (err) {
-      alert("Ask failed");
-    } finally {
-      setAsking(false);
-    }
-  }
+async function handleAsk() {
+  if (!question.trim() || !filename) return;
+  setAsking(true);
+  setAskResult(null);
 
-  async function handleFindJobs() {
-    if (!filename) return;
-    setFindingJobs(true);
-    setJobResult(null);
-    try {
-      const res = await fetch(`${API}/resume/find-jobs?filename=${filename}`, { method: "POST" });
-      const data = await res.json();
-      setJobResult(data);
-    } catch (err) {
-      alert("Job search failed");
-    } finally {
-      setFindingJobs(false);
-    }
-  }
+  // Start with empty answer
+  setAskResult({ question, answer: "", sources: [] });
 
+  try {
+    const params = new URLSearchParams({ question, filename, top_k: "3" });
+    const response = await fetch(`${API}/resume/ask/stream?${params}`);
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    let answer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split("\n\n");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const token = line.slice(6); // remove "data: " prefix
+          if (token === "[DONE]") break;
+          answer += token;
+          // Update answer in real time
+          setAskResult(prev => prev ? { ...prev, answer } : null);
+        }
+      }
+    }
+  } catch (err) {
+    alert("Ask failed");
+  } finally {
+    setAsking(false);
+  }
+}
   async function handleImprove() {
     if (!filename || !jobDesc.trim()) return;
     setImproving(true);
