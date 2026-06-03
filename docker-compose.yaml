@@ -13,6 +13,18 @@ services:
     volumes:
       - redis_data:/data
 
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: resume_agent
+      POSTGRES_PASSWORD: resume_agent
+      POSTGRES_DB: resume_agent
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
 volumes:
   qdrant_data:
   redis_data:
+  postgres_data:

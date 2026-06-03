@@ -8,10 +8,12 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = "GROQ_API_KEY"
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     TAVILY_API_KEY: str = "TAVILY_API_KEY"
-    
+
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     CACHE_TTL: int = 3600  # 1 hour in seconds
+
+    DATABASE_URL: str = "postgresql://resume_agent:resume_agent@127.0.0.1:5433/resume_agent"
     
     class Config:
         env_file = ".env"

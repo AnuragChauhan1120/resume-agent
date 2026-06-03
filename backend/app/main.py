@@ -3,10 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.api.resume import router as resume_router
 from app.pipeline.store import init_collection
+from app.core.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_collection()
+    init_db()
     yield
 
 app = FastAPI(title="Resume Agent", lifespan=lifespan)

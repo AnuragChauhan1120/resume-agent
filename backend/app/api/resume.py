@@ -13,6 +13,9 @@ from app.agents.resume_improver import improve_resume
 from app.models.resume import ImproveRequest, ImproveResponse
 from fastapi.responses import StreamingResponse
 from app.pipeline.generator import generate_answer_stream
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from app.core.database import get_db, ResumeUpload, JobSearch, QAHistory
 import tempfile
 import os
 
@@ -20,7 +23,7 @@ router = APIRouter(prefix="/resume", tags=["resume"])
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
     # Validate file type
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
@@ -54,6 +57,15 @@ async def upload_resume(file: UploadFile = File(...)):
             print(f"Length: {len(chunk.text)}")
         embedded = embed_chunks(chunks)
         ids = store_chunks(embedded)
+
+        # Log to Postgres
+        db_record = ResumeUpload(
+            filename=file.filename,
+            num_chunks=len(chunks),
+            sections_found=list(parsed.sections.keys())
+        )
+        db.add(db_record)
+        db.commit()
         
         return UploadResponse(
             filename=file.filename,
@@ -131,7 +143,7 @@ async def search_resume(request: SearchRequest):
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask_resume(request: AskRequest):
+async def ask_resume(request: AskRequest, db: Session = Depends(get_db)):
     # Step 1: generate multiple query rephrasings
     queries = generate_queries(request.question)
     print(f"\nGenerated queries: {queries}")
@@ -164,6 +176,15 @@ async def ask_resume(request: AskRequest):
     
     # Step 4: generate answer from reranked chunks
     answer = generate_answer(request.question, reranked)
+
+     # Log to Postgres
+    db_record = QAHistory(
+        filename=request.filename or "unknown",
+        question=request.question,
+        answer=answer
+    )
+    db.add(db_record)
+    db.commit()
     
     return AskResponse(
         question=request.question,
@@ -196,8 +217,19 @@ async def ask_resume(request: AskRequest):
 #     )
 
 @router.post("/find-jobs", response_model=JobSearchResponse)
-async def find_jobs_endpoint(filename: str):
+async def find_jobs_endpoint(filename: str, db: Session = Depends(get_db)):
     result = find_jobs(filename)
+
+     # Log to Postgres
+    db_record = JobSearch(
+        filename=filename,
+        profile=result["profile"],
+        queries_used=result["queries_used"],
+        jobs_found=len(result["jobs"])
+    )
+    db.add(db_record)
+    db.commit()
+
     return JobSearchResponse(
         profile=result["profile"],
         queries_used=result["queries_used"],
@@ -251,3 +283,15 @@ async def ask_resume_stream(question: str, filename: str = None, top_k: int = 3)
             "X-Accel-Buffering": "no"  # prevents nginx from buffering the stream
         }
     )
+
+@router.get("/history")
+async def get_history(db: Session = Depends(get_db)):
+    uploads = db.query(ResumeUpload).order_by(ResumeUpload.uploaded_at.desc()).all()
+    searches = db.query(JobSearch).order_by(JobSearch.searched_at.desc()).all()
+    questions = db.query(QAHistory).order_by(QAHistory.asked_at.desc()).all()
+    
+    return {
+        "uploads": [{"filename": u.filename, "chunks": u.num_chunks, "at": str(u.uploaded_at)} for u in uploads],
+        "job_searches": [{"filename": s.filename, "jobs_found": s.jobs_found, "at": str(s.searched_at)} for s in searches],
+        "questions": [{"filename": q.filename, "question": q.question, "at": str(q.asked_at)} for q in questions]
+    }
