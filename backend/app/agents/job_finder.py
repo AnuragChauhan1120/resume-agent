@@ -3,6 +3,7 @@ from app.core.config import settings
 from app.pipeline.embedder import embed_query
 from app.pipeline.store import search
 from app.pipeline.generator import generate_answer
+from app.core.cache import get_cached, set_cached, make_job_cache_key
 from groq import Groq
 
 tavily = TavilyClient(api_key=settings.TAVILY_API_KEY)
@@ -234,3 +235,32 @@ def find_jobs(filename: str) -> dict:
         "queries_used": queries,
         "jobs": ranked
     }
+
+
+def find_jobs(filename: str) -> dict:
+    # Check cache first
+    cache_key = make_job_cache_key(filename)
+    cached = get_cached(cache_key)
+    
+    if cached:
+        print(f"[Job Finder] Cache hit for {filename}")
+        return cached
+    
+    print("\n[Job Finder] Cache miss — searching...")
+    
+    profile = extract_resume_profile(filename)
+    queries = build_search_queries(profile)
+    jobs = search_jobs(queries)
+    ranked = rank_jobs(jobs, profile)
+
+    result = {
+        "profile": profile,
+        "queries_used": queries,
+        "jobs": ranked
+    }
+    
+    # Cache the result
+    set_cached(cache_key, result)
+    print(f"[Job Finder] Cached results for {filename}")
+    
+    return result

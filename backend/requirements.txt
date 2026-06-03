@@ -9,3 +9,4 @@ httpx
 
 pydantic-settings
 python-multipart
+redis
