@@ -70,6 +70,20 @@ async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     setUploading(false);
   }
 }
+async function handleFindJobs() {
+  if (!filename) return;
+  setFindingJobs(true);
+  setJobResult(null);
+  try {
+    const res = await fetch(`${API}/resume/find-jobs?filename=${filename}`, { method: "POST" });
+    const data = await res.json();
+    setJobResult(data);
+  } catch (err) {
+    alert("Job search failed");
+  } finally {
+    setFindingJobs(false);
+  }
+}
 
 async function handleAsk() {
   if (!question.trim() || !filename) return;
