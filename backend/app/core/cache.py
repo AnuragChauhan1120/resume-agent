@@ -2,11 +2,14 @@ import redis
 import json
 from app.core.config import settings
 
-client = redis.Redis(
-    host=settings.REDIS_HOST,
-    port=settings.REDIS_PORT,
-    decode_responses=True  # returns strings instead of bytes
-)
+if settings.REDIS_URL:
+    client = redis.from_url(settings.REDIS_URL)
+else:
+    client = redis.Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        decode_responses=True
+    )
 
 
 def get_cached(key: str) -> dict | None:

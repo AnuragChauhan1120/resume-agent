@@ -6,6 +6,8 @@ qdrant-client
 python-dotenv
 pydantic
 httpx
+tavily
+groq
 
 pydantic-settings
 python-multipart

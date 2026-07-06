@@ -65,7 +65,8 @@ def _extract_sections(text: str) -> dict:
         "skills", "technical skills",
         "projects",
         "certifications", "achievements",
-        "summary", "objective", "about"
+        "summary", "objective", "about",
+        "extra curriculars", "extracurricular", "activities"
     ]
     
     sections = {}

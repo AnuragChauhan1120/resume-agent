@@ -3,6 +3,11 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
+    QDRANT_URL: str = ""
+    QDRANT_API_KEY: str = ""
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_URL: str = ""
     COLLECTION_NAME: str = "resumes"
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     GROQ_API_KEY: str = "GROQ_API_KEY"

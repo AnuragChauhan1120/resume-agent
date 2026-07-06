@@ -7,7 +7,13 @@ from qdrant_client.models import (
 from app.core.config import settings
 import uuid
 
-client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
+if settings.QDRANT_URL:
+    client = QdrantClient(
+        url=settings.QDRANT_URL,
+        api_key=settings.QDRANT_API_KEY
+    )
+else:
+    client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 
 def init_collection():
@@ -21,8 +27,23 @@ def init_collection():
                 distance=Distance.COSINE
             )
         )
+        # Create index for filename filtering
+        client.create_payload_index(
+            collection_name=settings.COLLECTION_NAME,
+            field_name="filename",
+            field_schema="keyword"
+        )
         print(f"Created collection: {settings.COLLECTION_NAME}")
     else:
+        # Add index if collection exists but index doesn't
+        try:
+            client.create_payload_index(
+                collection_name=settings.COLLECTION_NAME,
+                field_name="filename",
+                field_schema="keyword"
+            )
+        except:
+            pass
         print(f"Collection already exists: {settings.COLLECTION_NAME}")
 
 
